@@ -19,16 +19,7 @@
 
 package org.languagetool.tagging.disambiguation.rules;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-
-import javax.xml.parsers.ParserConfigurationException;
-
 import junit.framework.TestCase;
-
 import org.languagetool.AnalyzedSentence;
 import org.languagetool.AnalyzedTokenReadings;
 import org.languagetool.JLanguageTool;
@@ -40,6 +31,13 @@ import org.languagetool.tagging.disambiguation.xx.DemoDisambiguator;
 import org.languagetool.tagging.disambiguation.xx.TrimDisambiguator;
 import org.languagetool.tools.StringTools;
 import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
 public class DisambiguationRuleTest extends TestCase {
 
@@ -60,8 +58,8 @@ public class DisambiguationRuleTest extends TestCase {
       System.out.println("Running disambiguation tests for " + lang.getName() + "...");
       final DisambiguationRuleLoader ruleLoader = new DisambiguationRuleLoader();
       final JLanguageTool languageTool = new JLanguageTool(lang);
-      if (!(languageTool.getLanguage().getDisambiguator() instanceof DemoDisambiguator)
-          && !(languageTool.getLanguage().getDisambiguator() instanceof TrimDisambiguator)) {
+      if (!(languageTool.getLanguage().getDisambiguatorLoaded() instanceof DemoDisambiguator)
+          && !(languageTool.getLanguage().getDisambiguatorLoaded() instanceof TrimDisambiguator)) {
         final String name = JLanguageTool.getDataBroker().getResourceDir() + "/" + lang.getShortName()
             + "/disambiguation.xml";
         validateRuleFile(name);

@@ -18,28 +18,6 @@
  */
 package org.languagetool;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.net.JarURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.ResourceBundle;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.jar.Manifest;
-
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.languagetool.chunking.Chunker;
 import org.languagetool.databroker.DefaultResourceDataBroker;
 import org.languagetool.databroker.ResourceDataBroker;
@@ -59,6 +37,27 @@ import org.languagetool.tagging.Tagger;
 import org.languagetool.tagging.disambiguation.Disambiguator;
 import org.languagetool.tokenizers.Tokenizer;
 import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.jar.Manifest;
 
 /**
  * The main class used for checking text against different rules:
@@ -197,7 +196,7 @@ public class JLanguageTool {
         builtinRules.add(element);
       }
     }
-    disambiguator = language.getDisambiguator();
+    disambiguator = language.getDisambiguatorLoaded();
     tagger = language.getTagger();
     sentenceTokenizer = language.getSentenceTokenizer();
     wordTokenizer = language.getWordTokenizer();
@@ -396,12 +395,14 @@ public class JLanguageTool {
     userRules.add(rule);
     final SuggestionExtractor extractor = new SuggestionExtractor();
     final List<String> suggestionTokens = extractor.getSuggestionTokens(rule, language);
-    final List<Rule> allActiveRules = getAllActiveRules();
-    addIgnoreWords(suggestionTokens, allActiveRules);
+    addIgnoreWords(suggestionTokens);
   }
 
-  private void addIgnoreWords(List<String> ignoreWords, List<Rule> allActiveRules) {
-    for (Rule activeRule : allActiveRules) {
+  /**
+   * Add the given words to the list of words to be ignored during spell check.
+   */
+  public void addIgnoreWords(List<String> ignoreWords) {
+    for (Rule activeRule : getAllActiveRules()) {
       if (activeRule instanceof SpellingCheckRule) {
         ((SpellingCheckRule)activeRule).addIgnoreTokens(ignoreWords);
       }

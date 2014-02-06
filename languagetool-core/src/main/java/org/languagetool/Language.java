@@ -28,6 +28,7 @@ import org.languagetool.rules.patterns.UnifierConfiguration;
 import org.languagetool.synthesis.Synthesizer;
 import org.languagetool.tagging.Tagger;
 import org.languagetool.tagging.disambiguation.Disambiguator;
+import org.languagetool.tagging.disambiguation.HybridDisambiguator;
 import org.languagetool.tagging.disambiguation.xx.DemoDisambiguator;
 import org.languagetool.tagging.xx.DemoTagger;
 import org.languagetool.tokenizers.RegexSentenceTokenizer;
@@ -41,32 +42,46 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.MissingResourceException;
+import java.util.ResourceBundle;
+import java.util.Set;
 
 /**
  * Base class for any supported language (English, German, etc). Language classes
  * are detected at runtime by searching the classpath for files named
  * {@code META-INF/org/languagetool/language-module.properties}. Those file(s)
  * need to contain a key {@code languageClasses} which specifies the fully qualified
- * class name(s), e.g. {@code org.languagetool.language.English}. Use commas to specify 
+ * class name(s), e.g. {@code org.languagetool.language.English}. Use commas to specify
  * more than one class.
  */
 public abstract class Language {
 
   public static final Language DEMO = new Demo();
-  
+
   private static final String PROPERTIES_PATH = "META-INF/org/languagetool/language-module.properties";
   private static final String PROPERTIES_KEY = "languageClasses";
-  
+
   private static List<Language> externalLanguages = new ArrayList<>();
-  
+
   /**
    * All languages supported by LanguageTool. This includes at least a "demo" language
    * for testing.
    */
   public static Language[] LANGUAGES = getLanguages();
-  
-  private static Language[] getLanguages() {
+
+    private Disambiguator disambiguator;
+    private Disambiguator customDisambiguator = null;
+
+    private static Language[] getLanguages() {
     final List<Language> languages = new ArrayList<>();
     final Set<String> languageClassNames = new HashSet<>();
     try {
@@ -135,7 +150,7 @@ public abstract class Language {
   private static final Tagger DEMO_TAGGER = new DemoTagger();
   private static final SentenceTokenizer SENTENCE_TOKENIZER = new RegexSentenceTokenizer();
   private static final WordTokenizer WORD_TOKENIZER = new WordTokenizer();
-  
+
   private UnifierConfiguration unifierConfiguration = new UnifierConfiguration();
   private UnifierConfiguration disambiguationUnifierConfiguration = new UnifierConfiguration();
 
@@ -154,7 +169,7 @@ public abstract class Language {
    * @return language name
    */
   public abstract String getName();
-  
+
   /**
    * Get this language's country options , e.g. <code>US</code> (as in <code>en-US</code>) or
    * <code>PL</code> (as in <code>pl-PL</code>).
@@ -172,10 +187,10 @@ public abstract class Language {
   public String getVariant() {
     return null;
   }
-  
+
   /**
-   * Get enabled rules different from the default ones for this language variant. 
-   * 
+   * Get enabled rules different from the default ones for this language variant.
+   *
    * @return enabled rules for the language variant.
    * @since 2.4
    */
@@ -184,8 +199,8 @@ public abstract class Language {
   }
 
   /**
-   * Get disabled rules different from the default ones for this language variant. 
-   * 
+   * Get disabled rules different from the default ones for this language variant.
+   *
    * @return disabled rules for the language variant.
    * @since 2.4
    */
@@ -268,12 +283,33 @@ public abstract class Language {
   /**
    * Get this language's part-of-speech disambiguator implementation or {@code null}.
    */
-  public Disambiguator getDisambiguator() {
+  public final Disambiguator getDisambiguatorLoaded() {
+    if (disambiguator == null) {
+      Disambiguator disambiguatorByDefault = getDisambiguator();
+
+      if( customDisambiguator != null ){
+        disambiguator = new HybridDisambiguator(disambiguatorByDefault, customDisambiguator);
+      }else{
+        disambiguator = disambiguatorByDefault;
+      }
+    }
+    return disambiguator;
+  }
+
+  protected Disambiguator getDisambiguator() {
     return DEMO_DISAMBIGUATOR;
   }
 
   /**
-   * Get this language's part-of-speech tagger implementation. The tagger must not 
+   * Set a additional disambiguator
+   */
+  public void setCustomDisambiguator(Disambiguator customDisambiguator) {
+    this.customDisambiguator = customDisambiguator;
+    this.disambiguator = null;
+  }
+
+  /**
+   * Get this language's part-of-speech tagger implementation. The tagger must not
    * be {@code null}, but it can be a trivial pseudo-tagger that only assigns {@code null} tags.
    */
   public Tagger getTagger() {
@@ -316,7 +352,7 @@ public abstract class Language {
   public Unifier getUnifier() {
     return unifierConfiguration.createUnifier();
   }
-  
+
   /**
    * Get this language's feature unifier used for disambiguation.
    * Note: it might be different from the normal rule unifier.
@@ -339,7 +375,7 @@ public abstract class Language {
   public UnifierConfiguration getDisambiguationUnifierConfiguration() {
     return disambiguationUnifierConfiguration;
   }
-  
+
   /**
    * Get the name of the language translated to the current locale,
    * if available. Otherwise, get the untranslated name.
@@ -355,7 +391,7 @@ public abstract class Language {
       }
     }
   }
-  
+
   /**
    * Get the short name of the language with country and variant (if any), if it is
    * a single-country language. For generic language classes, get only a two- or
@@ -364,7 +400,7 @@ public abstract class Language {
    */
   public final String getShortNameWithCountryAndVariant() {
     String name = getShortName();
-    if (getCountries().length == 1 
+    if (getCountries().length == 1
             && !name.contains("-x-")) {   // e.g. "de-DE-x-simple-language"
       name += "-" + getCountries()[0];
       if (getVariant() != null) {   // e.g. "ca-ES-valencia"
@@ -373,8 +409,8 @@ public abstract class Language {
     }
     return name;
   }
-  
-  
+
+
   /**
    * Start symbols used by {@link org.languagetool.rules.GenericUnpairedBracketsRule}.
    * Note that the array must be of equal length as {@link #getUnpairedRuleEndSymbols()} and the sequence of
@@ -391,9 +427,9 @@ public abstract class Language {
   public String[] getUnpairedRuleEndSymbols() {
     return new String[]{ "]", ")", "}", "\"", "'" };
   }
-  
+
   // -------------------------------------------------------------------------
-  
+
   /**
    * Re-inits the built-in languages and adds the specified ones.
    */
@@ -414,7 +450,7 @@ public abstract class Language {
   public static List<Language> getExternalLanguages() {
     return externalLanguages;
   }
-  
+
   /**
    * Return all languages supported by LanguageTool.
    * @return A list of all languages, including external ones and country variants (e.g. {@code en-US})
@@ -472,7 +508,7 @@ public abstract class Language {
   public static boolean isLanguageSupported(final String langCode) {
     return getLanguageForShortNameOrNull(langCode) != null;
   }
-  
+
   private static Language getLanguageForShortNameOrNull(final String langCode) {
     StringTools.assureSet(langCode, "langCode");
     Language result = null;
@@ -484,7 +520,7 @@ public abstract class Language {
         }
       }
     } else if (langCode.contains("-")) {
-      final String[] parts = langCode.split("-"); 
+      final String[] parts = langCode.split("-");
       if (parts.length == 2) { // e.g. en-US
         for (Language element : Language.LANGUAGES) {
           if (parts[0].equalsIgnoreCase(element.getShortName())
@@ -505,7 +541,7 @@ public abstract class Language {
           }
         }
       }
-      else { 
+      else {
         throw new IllegalArgumentException("'" + langCode + "' isn't a valid language code");
       }
     } else {
@@ -518,7 +554,7 @@ public abstract class Language {
     }
     return result;
   }
-  
+
   /**
    * Get the best match for a locale, using American English as the final fallback if nothing
    * else fits. The returned language will be a country variant language (e.g. British English, not just English)
@@ -579,7 +615,7 @@ public abstract class Language {
   public final String toString() {
     return getName();
   }
-  
+
   /**
    * Get sorted info about all maintainers (without country variants) to be used in the About dialog.
    * @param messages {{@link ResourceBundle} language bundle to translate the info
@@ -599,8 +635,8 @@ public abstract class Language {
           toSort.add(messages.getString(lang.getShortName()) +
               ": " + listToStringWithLineBreaks(names));
         }
-      }            
-    }    
+      }
+    }
     Collections.sort(toSort);
     for (final String lElem : toSort) {
       maintainersInfo.append(lElem);
