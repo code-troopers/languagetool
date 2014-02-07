@@ -81,10 +81,21 @@ public class LanguageToolMojo extends AbstractMojo {
   private LanguageFile[] languageFiles;
 
   /**
+  * Set this to 'true' to skip the spell checker
+  * @parameter
+  */
+  protected boolean skip = false;
+
+  /**
    * @see org.apache.maven.plugin.AbstractMojo#execute()
    */
   @Override
   public void execute() throws MojoExecutionException, MojoFailureException {
+
+    if( skip ){
+      getLog().warn("The spell checker languageTool is skipped!");
+      return;
+    }
 
     List<AbstractMojoExecutionException> exceptions = new ArrayList<AbstractMojoExecutionException>();
     boolean errorFound = false;
